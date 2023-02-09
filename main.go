@@ -85,7 +85,7 @@ func requestHandler(res http.ResponseWriter, req *http.Request) {
 
 		return
 	case "DELETE":
-		if os.RemoveAll(stateStorageFile) != nil {
+		if  err := os.RemoveAll(stateStorageFile); err != nil {
 			log.Printf("cannot remove file: %s\n", err)
 			goto not_found
 		}
