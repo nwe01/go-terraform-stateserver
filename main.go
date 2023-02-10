@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+
+	runtime "github.com/banzaicloud/logrus-runtime-formatter"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -23,21 +26,50 @@ func init() {
 	flag.StringVar(&flagDataPath, "data_path", os.TempDir(), "path to the data storage directory")
 
 	flag.StringVar(&flagListenAddress, "listen_address", "0.0.0.0:8080", "address:port to bind listener on")
+
+	// Log as JSON instead of the default ASCII formatter, but wrapped with the runtime Formatter.
+	formatter := runtime.Formatter{ChildFormatter: &log.JSONFormatter{}}
+	// Enable line number logging as well
+	formatter.Line = true
+
+	// Replace the default Logrus Formatter with our runtime Formatter
+	//log.SetFormatter(&formatter)
+	log.SetFormatter(&log.JSONFormatter{})
+
+	// Output to stdout instead of the default stderr
+	// Can be any io.Writer, see below for File example
+	log.SetOutput(os.Stdout)
+
+	// Only log the info severity or above.
+	log.SetLevel(log.InfoLevel)
 }
 
-func main() {
-	if !flag.Parsed() {
-		flag.Parse()
-	}
+func logRequest(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-	router := http.NewServeMux()
-	router.HandleFunc("/", requestHandler)
+		IPAddress := r.Header.Get("X-Real-Ip")
+		if IPAddress == "" {
+			IPAddress = r.Header.Get("X-Forwarded-For")
+		}
+		if IPAddress == "" {
+			IPAddress = r.RemoteAddr
+		}
+		var rip string
+		rip = IPAddress
+		ip := strings.Split(rip, ":")
 
-	if flagCertFile != "" && flagKeyFile != "" {
-		http.ListenAndServeTLS(flagListenAddress, flagCertFile, flagKeyFile, router)
-	} else {
-		http.ListenAndServe(flagListenAddress, router)
-	}
+		IPAddress = ip[0]
+
+		// initial logs
+		log.WithFields(log.Fields{
+			"remote_addr": IPAddress,
+			"method":      r.Method,
+			"request_uri": r.RequestURI,
+		}).Info("")
+
+		handler.ServeHTTP(w, r)
+
+	})
 }
 
 func requestHandler(res http.ResponseWriter, req *http.Request) {
@@ -48,6 +80,7 @@ func requestHandler(res http.ResponseWriter, req *http.Request) {
 
 	stateStorageFile := filepath.Join(flagDataPath, req.URL.Path)
 	stateStorageDir := filepath.Dir(stateStorageFile)
+
 
 	switch req.Method {
 	case "GET":
@@ -98,3 +131,18 @@ func requestHandler(res http.ResponseWriter, req *http.Request) {
 not_found:
 	http.NotFound(res, req)
 }
+
+func main() {
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+
+	http.HandleFunc("/", requestHandler)
+
+	if flagCertFile != "" && flagKeyFile != "" {
+		http.ListenAndServeTLS(flagListenAddress, flagCertFile, flagKeyFile,  logRequest(http.DefaultServeMux))
+	} else {
+		http.ListenAndServe(flagListenAddress, logRequest(http.DefaultServeMux))
+	}
+}
+
