@@ -47,29 +47,29 @@ func init() {
 func logRequest(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		IPAddress := r.Header.Get("X-Real-Ip")
-		if IPAddress == "" {
-			IPAddress = r.Header.Get("X-Forwarded-For")
-		}
-		if IPAddress == "" {
-			IPAddress = r.RemoteAddr
-		}
-		var rip string
-		rip = IPAddress
-		ip := strings.Split(rip, ":")
-
-		IPAddress = ip[0]
-
-		// initial logs
-		log.WithFields(log.Fields{
-			"remote_addr": IPAddress,
-			"method":      r.Method,
-			"request_uri": r.RequestURI,
-		}).Info("")
-
-		handler.ServeHTTP(w, r)
-
-	})
+    IPAddress := r.Header.Get("X-Real-Ip")
+    if IPAddress == "" {
+    	IPAddress = r.Header.Get("X-Forwarded-For")
+    }
+    if IPAddress == "" {
+    	IPAddress = r.RemoteAddr
+    }
+    var rip string
+    rip = IPAddress
+    ip := strings.Split(rip, ":")
+    
+    IPAddress = ip[0]
+    
+    // initial logs
+    log.WithFields(log.Fields{
+    	"remote_addr": IPAddress,
+    	"method":      r.Method,
+    	"request_uri": r.RequestURI,
+    }).Info("")
+    
+    handler.ServeHTTP(w, r)
+    
+    })
 }
 
 func requestHandler(res http.ResponseWriter, req *http.Request) {
