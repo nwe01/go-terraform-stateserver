@@ -65,6 +65,7 @@ func logRequest(handler http.Handler) http.Handler {
     	"remote_addr": IPAddress,
     	"method":      r.Method,
     	"request_uri": r.RequestURI,
+		"user_agent": r.Header.Get("User-Agent"),
     }).Info("")
     
     handler.ServeHTTP(w, r)
